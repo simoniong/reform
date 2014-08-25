@@ -2,6 +2,7 @@
 
 * Fix a bug where including a form module would mess up the options has of the validations (under older Rails).
 * `Form#save` now returns the result of the `model.save` invocation.
+* `::validates_uniqueness_of` now accepts options like `:scope`. Thanks to @cveneziani for a failing test and insight.
 
 ## 1.1.0
 
