@@ -15,24 +15,53 @@ module Reform::Form::ActiveRecord
     def i18n_scope
       :activerecord
     end
-  end
 
-  class UniquenessValidator < ::ActiveRecord::Validations::UniquenessValidator
-    # when calling validates it should create the Vali instance already and set @klass there! # TODO: fix this in AM.
-    def validate(form)
-      property = attributes.first
+    # validations/with
+    class Validuff
+      def initialize(validator)
+        @validator = validator
+      end
 
-      # here is the thing: why does AM::UniquenessValidator require a filled-out record to work properly? also, why do we need to set
-      # the class? it would be way easier to pass #validate a hash of attributes and get back an errors hash.
-      # the class for the finder could either be infered from the record or set in the validator instance itself in the call to ::validates.
-      record = form.model_for_property(property)
-      record.send("#{property}=", form.send(property))
-
-      @klass = record.class # this is usually done in the super-sucky #setup method.
-      super(record).tap do |res|
-        form.errors.add(property, record.errors.first.last) if record.errors.present?
+      def validate(form, *args)
+        # after instantiating a Validator, Rails also calls validator.setup(model.class). I tried to change this years ago in rails-core but it wasn't accepted.
+        @validator.instance_variable_set(:@klass, form.model.class) # this is why we need to change Rails.
+        @validator.validate(Facade.new(form))
       end
     end
+    def validate(validator, options)
+      return super unless validator.is_a? UniquenessValidator
+      # validator is already with #setup called.
+      super(Validuff.new(validator), options)
+    end
+
+    class Facade
+      def initialize(form)
+        @form, @model = form, form.model # TODO: get particular model for Composition
+      end
+
+      def method_missing(name, *args, &block)
+        form_readers = @form.send(:mapper).representable_attrs[:definitions].keys
+        form_readers << "errors"
+        return @form.send(name) if form_readers.include?(name.to_s)
+        if name.to_s == "read_attribute_for_validation"
+          puts "--- #{args.first}... #{@form.send(args.first) }"
+          return @form.send(args.first)
+
+        end
+
+        puts "??????????? #{@model.inspect}"
+        puts "#{name}, #{args.inspect} --> #{@model.send(name, *args, &block)}"
+        @model.send(name, *args, &block)
+      end
+
+      def class
+        @model.class
+      end
+    end
+  end
+
+  # TODO: remove.
+  class UniquenessValidator < ::ActiveRecord::Validations::UniquenessValidator
   end
 
 

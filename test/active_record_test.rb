@@ -46,16 +46,31 @@ class ActiveRecordTest < MiniTest::Spec
   end
 
   # uniqueness
-  it "has no errors on title when title is unique for the same artist and album" do
-    form.validate("title" => "The Gargoyle", "artist_id" => artist.id, "album" => album.id, "created_at" => "November 6, 1966")
-    assert_empty form.errors[:title]
+  describe "uniqueness with scope" do
+    class UniqueSongForm < Reform::Form
+      include Reform::Form::ActiveRecord
+      model :song
+
+      validates_uniqueness_of :title, scope: [:album_id, :artist_id]
+      property :title
+      property :album_id
+      property :artist_id
+    end
+
+    let (:form) { UniqueSongForm.new(Song.new) }
+
+    it "has no errors on title when title is unique for the same artist and album" do
+      form.validate("title" => "The Gargoyle", "artist_id" => artist.id, "album" => album.id, "created_at" => "November 6, 1966").must_equal true
+      assert_empty form.errors[:title]
+    end
+
+    it "has errors on title when title is taken for the same artist and album xxx" do
+      Song.create(title: "Windowpane", artist_id: artist.id, album_id: album.id)
+      form.validate("title" => "Windowpane", "artist_id" => artist.id, "album_id" => album.id, "created_at" => "November 6, 1966")#.must_equal false
+      refute_empty form.errors[:title]
+    end
   end
 
-  it "has errors on title when title is taken for the same artist and album" do
-    Song.create(title: "Windowpane", artist_id: artist.id, album_id: album.id)
-    form.validate("title" => "Windowpane", "artist_id" => artist.id, "album" => album)
-    refute_empty form.errors[:title]
-  end
 
   # nested object taken.
   it "is valid when artist name is unique" do
