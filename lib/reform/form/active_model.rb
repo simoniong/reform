@@ -92,7 +92,12 @@ module Reform::Form::ActiveModel
   private
     def active_model_name_for(string)
       return ::ActiveModel::Name.new(OpenStruct.new(:name => string)) if Reform.rails3_0?
-      ::ActiveModel::Name.new(self, nil, string)
+
+      namespace = string.constantize.parents.detect do |n|
+        n.respond_to?(:use_relative_model_naming?) && n.use_relative_model_naming?
+      end
+
+      ::ActiveModel::Name.new(self, namespace, string)
     end
   end
 end
